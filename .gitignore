@@ -1,0 +1,25 @@
+# Build
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# Publicación
+publish/
+*.pubxml
+
+# NuGet
+*.nupkg
+packages/
+
+# IDE
+.idea/
+.vscode/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
