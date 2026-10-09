@@ -39,9 +39,9 @@ public class SyncRepository : ISyncRepository
         };
     }
 
-    // ─────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // ENTRADAS
-    // ─────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     private async Task<SyncResultado> ProcesarEntradaAsync(OperacionSync op)
     {
         await using var conn = new NpgsqlConnection(_connectionString);
@@ -101,9 +101,9 @@ public class SyncRepository : ISyncRepository
         };
     }
 
-    // ─────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // SALIDAS
-    // ─────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     private async Task<SyncResultado> ProcesarSalidaAsync(OperacionSync op)
     {
         await using var conn = new NpgsqlConnection(_connectionString);
@@ -160,14 +160,15 @@ public class SyncRepository : ISyncRepository
         };
     }
 
-    // ─────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // CONSUMO
-    // ─────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     private async Task<SyncResultado> ProcesarConsumoAsync(OperacionSync op)
     {
         await using var conn = new NpgsqlConnection(_connectionString);
         await conn.OpenAsync();
 
+        // 1. Verificar duplicado
         var existente = await conn.QueryFirstOrDefaultAsync<int?>(
             "SELECT id FROM public.movimientos_consumo WHERE id_local_movil = @IdLocalMovil LIMIT 1;",
             new { op.IdLocalMovil });
@@ -183,16 +184,55 @@ public class SyncRepository : ISyncRepository
             };
         }
 
+        // 2. Obtener saldo anterior del bien
+        var saldoAnterior = await conn.QueryFirstOrDefaultAsync<dynamic>(@"
+            SELECT saldo_cantidad, saldo_valor, cpp
+            FROM public.movimientos_consumo
+            WHERE bien_id = @BienId AND anulada = false
+            ORDER BY id DESC LIMIT 1;",
+            new { op.BienId });
+
+        decimal saldoCantAnterior = saldoAnterior?.saldo_cantidad ?? 0m;
+        decimal saldoValorAnterior = saldoAnterior?.saldo_valor ?? 0m;
+        decimal cppAnterior = saldoAnterior?.cpp ?? 0m;
+
+        // 3. Calcular nuevo saldo y CPP
+        var tipoMov = (op.TipoMovimiento ?? "ENTRADA").ToUpperInvariant();
+        decimal cantidad = op.Cantidad ?? 0m;
+        decimal costoUnit = op.CostoUnitario ?? 0m;
+        decimal valorMov = op.ValorMovimiento ?? (cantidad * costoUnit);
+
+        decimal nuevoSaldoCant;
+        decimal nuevoSaldoValor;
+        decimal nuevoCpp;
+
+        if (tipoMov == "ENTRADA")
+        {
+            nuevoSaldoCant = saldoCantAnterior + cantidad;
+            nuevoSaldoValor = saldoValorAnterior + valorMov;
+            nuevoCpp = nuevoSaldoCant > 0
+                ? Math.Round(nuevoSaldoValor / nuevoSaldoCant, 4)
+                : 0m;
+        }
+        else
+        {
+            // SALIDA
+            nuevoSaldoCant = saldoCantAnterior - cantidad;
+            nuevoCpp = cppAnterior > 0 ? cppAnterior : costoUnit;
+            nuevoSaldoValor = nuevoSaldoCant * nuevoCpp;
+        }
+
+        // 4. Insertar movimiento con saldos calculados
         const string sql = @"
             INSERT INTO public.movimientos_consumo (
                 bien_id, institucion_id, tipo_movimiento, fecha_movimiento, cantidad,
-                costo_unitario, valor_movimiento, documento_referencia,
-                proveedor_id, funcionario_recibe_id, observaciones,
+                costo_unitario, valor_movimiento, saldo_cantidad, saldo_valor, cpp,
+                documento_referencia, proveedor_id, funcionario_recibe_id, observaciones,
                 created_at, anulada, id_local_movil
             ) VALUES (
                 @BienId, @InstitucionId, @TipoMovimiento, @FechaMovimiento, @Cantidad,
-                @CostoUnitario, @ValorMovimiento, @DocumentoReferencia,
-                @ProveedorId, @FuncionarioRecibeId, @Observaciones,
+                @CostoUnitario, @ValorMovimiento, @SaldoCantidad, @SaldoValor, @Cpp,
+                @DocumentoReferencia, @ProveedorId, @FuncionarioRecibeId, @Observaciones,
                 NOW(), FALSE, @IdLocalMovil
             ) RETURNING id;";
 
@@ -205,6 +245,9 @@ public class SyncRepository : ISyncRepository
             op.Cantidad,
             op.CostoUnitario,
             op.ValorMovimiento,
+            SaldoCantidad = nuevoSaldoCant,
+            SaldoValor = nuevoSaldoValor,
+            Cpp = nuevoCpp,
             op.DocumentoReferencia,
             op.ProveedorId,
             op.FuncionarioRecibeId,
