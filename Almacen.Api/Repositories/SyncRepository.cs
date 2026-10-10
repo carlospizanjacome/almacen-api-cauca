@@ -283,7 +283,7 @@ public class SyncRepository : ISyncRepository
 
         // AUDITORIA
         await RegistrarAuditoriaAsync(conn, ctx,
-            modulo: "Consumo",
+            modulo: "consumo",
             objetoId: nuevoId,
             objetoCodigo: op.BienCodigo,
             descripcion: $"Consumo {tipoMov} sincronizado desde movil: {op.BienNombre} ({cantidad} unidades)",
