@@ -7,7 +7,7 @@ using Microsoft.OpenApi.Models;
 using Serilog;
 
 // ============================================================
-// Serilog â€” logging estructurado
+// Serilog Ã¢â‚¬â€ logging estructurado
 // ============================================================
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -30,14 +30,14 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo
     {
-        Title = "AlmacÃ©n MÃ³vil â€” API REST",
+        Title = "AlmacÃƒÂ©n MÃƒÂ³vil Ã¢â‚¬â€ API REST",
         Version = "v1",
-        Description = "API para la app mÃ³vil de inventario educativo offline (Android)."
+        Description = "API para la app mÃƒÂ³vil de inventario educativo offline (Android)."
     });
 
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        Description = "Introduce el JWT aquÃ­. Formato: Bearer {token}",
+        Description = "Introduce el JWT aquÃƒÂ­. Formato: Bearer {token}",
         Name = "Authorization",
         In = ParameterLocation.Header,
         Type = SecuritySchemeType.ApiKey,
@@ -104,10 +104,11 @@ builder.Services.AddCors(options =>
 });
 
 // ============================================================
-// InyecciÃ³n de dependencias
+// InyecciÃƒÂ³n de dependencias
 // ============================================================
 builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
 builder.Services.AddScoped<IBienRepository, BienRepository>();
+    builder.Services.AddScoped<IProveedorRepository, ProveedorRepository>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
     builder.Services.AddScoped<ISyncRepository, SyncRepository>();
@@ -122,7 +123,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "AlmacÃ©n MÃ³vil API v1");
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "AlmacÃƒÂ©n MÃƒÂ³vil API v1");
         c.RoutePrefix = "swagger";
     });
 }
@@ -142,5 +143,5 @@ app.MapGet("/health", () => new
     version = "1.0.0"
 });
 
-Log.Information("API AlmacÃ©n MÃ³vil iniciada correctamente");
+Log.Information("API AlmacÃƒÂ©n MÃƒÂ³vil iniciada correctamente");
 app.Run();
