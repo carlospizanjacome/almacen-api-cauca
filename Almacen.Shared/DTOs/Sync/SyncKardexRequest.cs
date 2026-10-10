@@ -6,4 +6,9 @@ namespace Almacen.Shared.DTOs.Sync;
 public class SyncKardexRequest
 {
     public List<OperacionSync> Operaciones { get; set; } = new();
+
+    /// <summary>
+    /// Nombre del dispositivo (ej: SM-A600). Para auditoria.
+    /// </summary>
+    public string? DispositivoId { get; set; }
 }

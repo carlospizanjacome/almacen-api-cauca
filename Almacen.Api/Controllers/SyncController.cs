@@ -24,12 +24,24 @@ public class SyncController : ControllerBase
     [HttpPost("kardex")]
     public async Task<IActionResult> SincronizarKardex([FromBody] SyncKardexRequest request)
     {
-        var usuarioId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-            ?? User.FindFirst("sub")?.Value
-            ?? "desconocido";
+        // Extraer datos del usuario desde el JWT
+        var contexto = new SyncContexto
+        {
+            UsuarioId = ObtenerInt(User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                                 ?? User.FindFirst("sub")?.Value),
+            UsuarioEmail = User.FindFirst(ClaimTypes.Email)?.Value
+                         ?? User.FindFirst("email")?.Value,
+            UsuarioNombre = User.FindFirst(ClaimTypes.Name)?.Value
+                          ?? User.FindFirst("name")?.Value,
+            InstitucionId = ObtenerInt(User.FindFirst("institucionId")?.Value),
+            DispositivoId = request.DispositivoId,
+            UserAgent = Request.Headers["User-Agent"].ToString()
+        };
 
-        _logger.LogInformation("Sync kardex: usuario={Usuario} operaciones={Total}",
-            usuarioId, request.Operaciones?.Count ?? 0);
+        _logger.LogInformation(
+            "Sync kardex: usuario={Usuario} ({Email}) inst={Inst} dispositivo={Disp} operaciones={Total}",
+            contexto.UsuarioNombre, contexto.UsuarioEmail, contexto.InstitucionId,
+            contexto.DispositivoId, request.Operaciones?.Count ?? 0);
 
         if (request.Operaciones is null || request.Operaciones.Count == 0)
         {
@@ -51,7 +63,7 @@ public class SyncController : ControllerBase
         {
             try
             {
-                var resultado = await _syncRepo.ProcesarOperacionAsync(op);
+                var resultado = await _syncRepo.ProcesarOperacionAsync(op, contexto);
                 respuesta.Resultados.Add(resultado);
 
                 switch (resultado.Estado)
@@ -79,5 +91,10 @@ public class SyncController : ControllerBase
             respuesta.TotalOk, respuesta.TotalDuplicadas, respuesta.TotalError);
 
         return Ok(ApiResponse.Ok(respuesta, "Sincronizacion procesada"));
+    }
+
+    private static int ObtenerInt(string? valor)
+    {
+        return int.TryParse(valor, out var n) ? n : 0;
     }
 }

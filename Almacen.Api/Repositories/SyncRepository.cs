@@ -6,7 +6,7 @@ namespace Almacen.Api.Repositories;
 
 public interface ISyncRepository
 {
-    Task<SyncResultado> ProcesarOperacionAsync(OperacionSync op);
+    Task<SyncResultado> ProcesarOperacionAsync(OperacionSync op, SyncContexto contexto);
 }
 
 public class SyncRepository : ISyncRepository
@@ -21,15 +21,15 @@ public class SyncRepository : ISyncRepository
         _logger = logger;
     }
 
-    public async Task<SyncResultado> ProcesarOperacionAsync(OperacionSync op)
+    public async Task<SyncResultado> ProcesarOperacionAsync(OperacionSync op, SyncContexto contexto)
     {
         var tipo = (op.Tipo ?? "").ToUpperInvariant();
 
         return tipo switch
         {
-            "ENTRADA" => await ProcesarEntradaAsync(op),
-            "SALIDA"  => await ProcesarSalidaAsync(op),
-            "CONSUMO" => await ProcesarConsumoAsync(op),
+            "ENTRADA" => await ProcesarEntradaAsync(op, contexto),
+            "SALIDA"  => await ProcesarSalidaAsync(op, contexto),
+            "CONSUMO" => await ProcesarConsumoAsync(op, contexto),
             _ => new SyncResultado
             {
                 IdLocalMovil = op.IdLocalMovil,
@@ -39,15 +39,14 @@ public class SyncRepository : ISyncRepository
         };
     }
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+    // ============================================================
     // ENTRADAS
-    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-    private async Task<SyncResultado> ProcesarEntradaAsync(OperacionSync op)
+    // ============================================================
+    private async Task<SyncResultado> ProcesarEntradaAsync(OperacionSync op, SyncContexto ctx)
     {
         await using var conn = new NpgsqlConnection(_connectionString);
         await conn.OpenAsync();
 
-        // 1. Verificar duplicado
         var existente = await conn.QueryFirstOrDefaultAsync<int?>(
             "SELECT id FROM public.entradas WHERE id_local_movil = @IdLocalMovil LIMIT 1;",
             new { op.IdLocalMovil });
@@ -63,7 +62,6 @@ public class SyncRepository : ISyncRepository
             };
         }
 
-        // 2. Insertar
         const string sql = @"
             INSERT INTO public.entradas (
                 bien_id, tipo_fuente, numero_factura, fecha_entrada, valor,
@@ -90,6 +88,14 @@ public class SyncRepository : ISyncRepository
             op.IdLocalMovil
         });
 
+        // AUDITORIA
+        await RegistrarAuditoriaAsync(conn, ctx,
+            modulo: "entradas",
+            objetoId: nuevoId,
+            objetoCodigo: op.BienCodigo,
+            descripcion: $"Entrada sincronizada desde movil: {op.BienNombre}",
+            documentoReferencia: op.NumeroFactura);
+
         _logger.LogInformation("Entrada sync OK: idLocal={IdLocal} idServidor={IdServidor}",
             op.IdLocalMovil, nuevoId);
 
@@ -101,10 +107,10 @@ public class SyncRepository : ISyncRepository
         };
     }
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+    // ============================================================
     // SALIDAS
-    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-    private async Task<SyncResultado> ProcesarSalidaAsync(OperacionSync op)
+    // ============================================================
+    private async Task<SyncResultado> ProcesarSalidaAsync(OperacionSync op, SyncContexto ctx)
     {
         await using var conn = new NpgsqlConnection(_connectionString);
         await conn.OpenAsync();
@@ -149,6 +155,14 @@ public class SyncRepository : ISyncRepository
             op.IdLocalMovil
         });
 
+        // AUDITORIA
+        await RegistrarAuditoriaAsync(conn, ctx,
+            modulo: "salidas",
+            objetoId: nuevoId,
+            objetoCodigo: op.BienCodigo,
+            descripcion: $"Salida sincronizada desde movil: {op.BienNombre}",
+            documentoReferencia: op.NumeroActaComite);
+
         _logger.LogInformation("Salida sync OK: idLocal={IdLocal} idServidor={IdServidor}",
             op.IdLocalMovil, nuevoId);
 
@@ -160,15 +174,14 @@ public class SyncRepository : ISyncRepository
         };
     }
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+    // ============================================================
     // CONSUMO
-    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-    private async Task<SyncResultado> ProcesarConsumoAsync(OperacionSync op)
+    // ============================================================
+    private async Task<SyncResultado> ProcesarConsumoAsync(OperacionSync op, SyncContexto ctx)
     {
         await using var conn = new NpgsqlConnection(_connectionString);
         await conn.OpenAsync();
 
-        // 1. Verificar duplicado
         var existente = await conn.QueryFirstOrDefaultAsync<int?>(
             "SELECT id FROM public.movimientos_consumo WHERE id_local_movil = @IdLocalMovil LIMIT 1;",
             new { op.IdLocalMovil });
@@ -184,7 +197,6 @@ public class SyncRepository : ISyncRepository
             };
         }
 
-        // 2. Obtener saldo anterior del bien
         var saldoAnterior = await conn.QueryFirstOrDefaultAsync<dynamic>(@"
             SELECT saldo_cantidad, saldo_valor, cpp
             FROM public.movimientos_consumo
@@ -196,7 +208,6 @@ public class SyncRepository : ISyncRepository
         decimal saldoValorAnterior = saldoAnterior?.saldo_valor ?? 0m;
         decimal cppAnterior = saldoAnterior?.cpp ?? 0m;
 
-        // 3. Calcular nuevo saldo y CPP
         var tipoMov = (op.TipoMovimiento ?? "ENTRADA").ToUpperInvariant();
         decimal cantidad = op.Cantidad ?? 0m;
         decimal costoUnit = op.CostoUnitario ?? 0m;
@@ -216,13 +227,11 @@ public class SyncRepository : ISyncRepository
         }
         else
         {
-            // SALIDA
             nuevoSaldoCant = saldoCantAnterior - cantidad;
             nuevoCpp = cppAnterior > 0 ? cppAnterior : costoUnit;
             nuevoSaldoValor = nuevoSaldoCant * nuevoCpp;
         }
 
-        // 4. Insertar movimiento con saldos calculados
         const string sql = @"
             INSERT INTO public.movimientos_consumo (
                 bien_id, institucion_id, tipo_movimiento, fecha_movimiento, cantidad,
@@ -255,7 +264,7 @@ public class SyncRepository : ISyncRepository
             op.IdLocalMovil
         });
 
-        // Actualizar el stock del bien de consumo con el nuevo saldo
+        // Actualizar stock del bien
         const string sqlUpdateBien = @"
             UPDATE public.bienes
             SET stock_actual = @StockActual,
@@ -272,6 +281,14 @@ public class SyncRepository : ISyncRepository
             ValorStock = nuevoSaldoValor
         });
 
+        // AUDITORIA
+        await RegistrarAuditoriaAsync(conn, ctx,
+            modulo: "movimientos_consumo",
+            objetoId: nuevoId,
+            objetoCodigo: op.BienCodigo,
+            descripcion: $"Consumo {tipoMov} sincronizado desde movil: {op.BienNombre} ({cantidad} unidades)",
+            documentoReferencia: op.DocumentoReferencia);
+
         _logger.LogInformation("Consumo sync OK: idLocal={IdLocal} idServidor={IdServidor}",
             op.IdLocalMovil, nuevoId);
 
@@ -281,5 +298,54 @@ public class SyncRepository : ISyncRepository
             Estado = "OK",
             IdServidor = nuevoId
         };
+    }
+
+    // ============================================================
+    // AUDITORIA
+    // ============================================================
+    private async Task RegistrarAuditoriaAsync(
+        NpgsqlConnection conn,
+        SyncContexto ctx,
+        string modulo,
+        int objetoId,
+        string? objetoCodigo,
+        string descripcion,
+        string? documentoReferencia)
+    {
+        try
+        {
+            const string sql = @"
+                INSERT INTO public.auditoria (
+                    institucion_id, usuario_id, usuario_email, usuario_nombre,
+                    operacion, modulo, severidad,
+                    objeto_tipo, objeto_id, objeto_codigo, objeto_descripcion,
+                    documento_referencia, ip, user_agent
+                ) VALUES (
+                    @InstitucionId, @UsuarioId, @UsuarioEmail, @UsuarioNombre,
+                    'CREAR', @Modulo, 'INFO',
+                    'Movil', @ObjetoId, @ObjetoCodigo, @Descripcion,
+                    @DocumentoReferencia, @Ip, @UserAgent
+                );";
+
+            await conn.ExecuteAsync(sql, new
+            {
+                ctx.InstitucionId,
+                ctx.UsuarioId,
+                ctx.UsuarioEmail,
+                ctx.UsuarioNombre,
+                Modulo = modulo,
+                ObjetoId = objetoId,
+                ObjetoCodigo = objetoCodigo,
+                Descripcion = descripcion,
+                DocumentoReferencia = documentoReferencia,
+                Ip = "movil",
+                UserAgent = $"MAUI Android ({ctx.DispositivoId ?? "desconocido"})"
+            });
+        }
+        catch (Exception ex)
+        {
+            // No romper el sync si falla la auditoria
+            _logger.LogWarning(ex, "No se pudo registrar auditoria para {Modulo} id={Id}", modulo, objetoId);
+        }
     }
 }
