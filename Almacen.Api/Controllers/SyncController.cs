@@ -33,7 +33,9 @@ public class SyncController : ControllerBase
                          ?? User.FindFirst("email")?.Value,
             UsuarioNombre = User.FindFirst(ClaimTypes.Name)?.Value
                           ?? User.FindFirst("name")?.Value,
-            InstitucionId = ObtenerInt(User.FindFirst("institucionId")?.Value),
+            InstitucionId = ObtenerInt(
+                User.FindFirst("institucionId")?.Value
+                ?? User.FindFirst("institucion_id")?.Value),
             DispositivoId = request.DispositivoId,
             UserAgent = Request.Headers["User-Agent"].ToString()
         };
